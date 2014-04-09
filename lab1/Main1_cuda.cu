@@ -50,7 +50,38 @@ cudaSum_linear_kernel(const float* const inputs,
                                   const float* const c,
                                   unsigned int polynomialOrder, 
                                   float * output) {
-    //TODO
+    extern __shared__ float partial_outputs[];
+
+    unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    float * const pout = partial_outputs + threadIdx.x;
+
+    if (polynomialOrder == 0)
+       return;
+
+    while (inputIndex < numberOfInputs) {
+      *pout += c[0];
+
+      float p = 1.0;
+      float r = inputs[inputIndex];
+      
+      for (unsigned int i = 1; i < polynomialOrder; ++i) {
+        *pout += c[i] * (p *= r);
+      }
+
+      inputIndex += blockDim.x * gridDim.x;
+    }
+
+    atomicAdd(output, *pout);
+
+    // Makes all threads in the block finish before continuing
+    syncthreads();
+
+    if (threadIdx.x == 0) {
+      float partialSum = 0.0;
+      for (unsigned int i = 0; i < blockDim.x; ++i)
+        partialSum += partial_outputs[i];
+      atomicAdd(output, partialSum);
+    }
 }
 
 
@@ -110,7 +141,7 @@ cudaSumPolynomials(const float* const input,
     
     //Your output will go here (GPU)
     float *dev_output;
-    const float float_zero = 1.0f;
+    const float float_zero = 0.0f;
 
     // Allocate memory for GPU to hold inputs
     cudaMalloc((void **) &dev_input,  numberOfInputs  * sizeof(float));
