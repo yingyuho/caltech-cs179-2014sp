@@ -52,15 +52,18 @@ cudaSum_linear_kernel(const float* const inputs,
                                   float * output) {
     extern __shared__ float partial_outputs[];
 
-    if (threadIdx.x == 0) {
-      for (unsigned int i = 0; i < blockDim.x; ++i)
-        partial_outputs[i] = 0.0;
-    }
+    // Initialize shared memory to 0.0
+    // if (threadIdx.x == 0) {
+    //   for (unsigned int i = 0; i < blockDim.x; ++i)
+    //     partial_outputs[i] = 0.0;
+    // }
 
-    syncthreads();
+    // syncthreads();
 
     unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
     float * const pout = partial_outputs + threadIdx.x;
+
+    *pout = 0;
 
     if (polynomialOrder == 0)
        return;
@@ -78,11 +81,9 @@ cudaSum_linear_kernel(const float* const inputs,
       inputIndex += blockDim.x * gridDim.x;
     }
 
-    // atomicAdd(output, *pout);
-
-    // Makes all threads in the block finish before continuing
     syncthreads();
 
+    // Accumulate results from shared memory
     if (threadIdx.x == 0) {
       float partialSum = 0.0;
       for (unsigned int i = 0; i < blockDim.x; ++i)
@@ -157,9 +158,8 @@ cudaSumPolynomials(const float* const input,
     cudaMalloc((void **) &dev_c,      polynomialOrder * sizeof(float));
     cudaMemcpy(dev_c,     c,      polynomialOrder * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Allocate memory for GPU to hold outputs
+    // Allocate memory for GPU to hold output
     cudaMalloc((void **) &dev_output, sizeof(float));
-    // cudaMemset(dev_output, 0, sizeof(float));
     cudaMemcpy(dev_output, &float_zero, sizeof(float), cudaMemcpyHostToDevice);
     
     const unsigned int threadsPerBlock = 512;
