@@ -71,7 +71,7 @@ cudaSum_linear_kernel(const float* const inputs,
       inputIndex += blockDim.x * gridDim.x;
     }
 
-    atomicAdd(output, *pout);
+    // atomicAdd(output, *pout);
 
     // Makes all threads in the block finish before continuing
     syncthreads();
