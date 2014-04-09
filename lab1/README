@@ -1,0 +1,172 @@
+===========
+Compilation
+===========
+
+"make" generates the executable "Main1"
+
+The supplied Makefile works for minuteman.cms.caltech.edu
+
+=====
+Usage
+=====
+
+Main1 [POLYNOMIAL_DEGREE]
+
+=========
+Questions
+=========
+
+a)
+
+i. Correct.
+
+ii. 
+
+void test2(){
+-   int *a = 3;
++   int *a = (int *) malloc(sizeof(int));
++   *a = 3;
+
+iii.
+
+void test3(){
+-   int* a,b;
++   int *a, *b;
+
+iv.
+
+void test4(){
+-   int i, *a = (int*) malloc(1000);
++   int i, *a = (int*) malloc(1000 * sizeof(int));
+
+v.
+
+void test5(){
+    int **a = (int**) malloc(3*sizeof(int*));
++   for (int i = 0; i < 3; ++i)
++       a[i] = (int *) malloc(100 * sizeof(int));
+
+vi.
+
+It prints a message if "a" is a null pointer (out of memory).
+
+b)
+
+    // Allocate memory for GPU to hold inputs
+    cudaMalloc((void **) &dev_input,  numberOfInputs  * sizeof(float));
+    cudaMalloc((void **) &dev_c,      polynomialOrder * sizeof(float));
+
+    cudaMemcpy(dev_input, input,  numberOfInputs  * sizeof(float), 
+      cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_c,     c,      polynomialOrder * sizeof(float),
+      cudaMemcpyHostToDevice);
+
+    // Allocate memory for GPU to hold output
+    cudaMalloc((void **) &dev_output, sizeof(float));
+    cudaMemcpy(dev_output, &float_zero, sizeof(float), 
+      cudaMemcpyHostToDevice);
+
+    ...
+
+    // Copy output from GPU
+    cudaMemcpy(output, dev_output, sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Free GPU memory
+    cudaFree(dev_input);
+    cudaFree(dev_c);
+    cudaFree(dev_output);
+
+c)
+
+__global__
+void
+cudaSum_atomic_kernel(const float* const inputs,
+                                     unsigned int numberOfInputs,
+                                     const float* const c,
+                                     unsigned int polynomialOrder,
+                                     float* output) {
+
+    float partialSum = 0.0;
+
+    unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+
+    unsigned int i;
+    float p, r;
+
+    if (polynomialOrder == 0)
+       return;
+
+    while (inputIndex < numberOfInputs) {
+      partialSum += c[0];
+
+      p = 1.0;
+      r = inputs[inputIndex];
+      for (i = 1; i < polynomialOrder; ++i) {
+        partialSum += c[i] * (p *= r);
+      }
+
+      inputIndex += blockDim.x * gridDim.x;
+    }
+
+    atomicAdd(output, partialSum);
+}
+
+d)
+
+__global__
+void
+cudaSum_linear_kernel(const float* const inputs, 
+                                  unsigned int numberOfInputs, 
+                                  const float* const c,
+                                  unsigned int polynomialOrder, 
+                                  float * output) {
+    extern __shared__ float partial_outputs[];
+
+    unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    float * const pout = partial_outputs + threadIdx.x;
+
+    // Initialize shared memory to 0.0
+    *pout = 0;
+
+    if (polynomialOrder == 0)
+       return;
+
+    while (inputIndex < numberOfInputs) {
+      *pout += c[0];
+
+      float p = 1.0;
+      float r = inputs[inputIndex];
+      
+      for (unsigned int i = 1; i < polynomialOrder; ++i) {
+        *pout += c[i] * (p *= r);
+      }
+
+      inputIndex += blockDim.x * gridDim.x;
+    }
+
+    syncthreads();
+
+    // Accumulate results from shared memory
+    if (threadIdx.x == 0) {
+      float partialSum = 0.0;
+      for (unsigned int i = 0; i < blockDim.x; ++i)
+        partialSum += partial_outputs[i];
+      atomicAdd(output, partialSum);
+    }
+}
+
+e)
+
+[yingyu@minuteman:~/caltech-cs179-2014sp/lab1]> ./Main1
+using 10 primingRuns and  5 repeats, polynomial order of 10
+ 512 threads per block and 50 max blocks
+speedup &  mutex & linear \\
+10^3    &   0.08 &   0.07 \\
+10^4    &   0.66 &   0.87 \\
+10^5    &   4.20 &   6.87 \\
+10^6    &  19.19 &  21.09 \\
+
+GPU parallelization reduces time cost per r value but adds some constant 
+overhead, so the speedup increases as number of r values increases.
+Linear kernel performs slightly better than mutex kernel due to lesser calls
+on atomicAdd(). 
