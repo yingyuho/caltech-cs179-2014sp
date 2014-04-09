@@ -52,6 +52,13 @@ cudaSum_linear_kernel(const float* const inputs,
                                   float * output) {
     extern __shared__ float partial_outputs[];
 
+    if (threadIdx.x == 0) {
+      for (unsigned int i = 0; i < blockDim.x; ++i)
+        partial_outputs[i] = 0.0;
+    }
+
+    syncthreads();
+
     unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
     float * const pout = partial_outputs + threadIdx.x;
 
