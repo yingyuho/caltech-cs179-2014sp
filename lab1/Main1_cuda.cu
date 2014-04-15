@@ -86,7 +86,6 @@ cudaSum_linear_kernel(const float* const inputs,
 }
 
 
-/* Used in Assignment 2. Coming soon! */
 __global__
 void
 cudaSum_divtree_kernel(const float* const inputs, 
@@ -94,8 +93,43 @@ cudaSum_divtree_kernel(const float* const inputs,
                                   const float* const c,
                                   unsigned int polynomialOrder, 
                                   float * output) {
-    
+    extern __shared__ float partial_outputs[];
 
+    unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    float * const pout = partial_outputs + threadIdx.x;
+
+    // Initialize shared memory to 0.0
+    *pout = 0;
+
+    if (polynomialOrder == 0)
+       return;
+
+    while (inputIndex < numberOfInputs) {
+      *pout += c[0];
+
+      float p = 1.0;
+      float r = inputs[inputIndex];
+      
+      for (unsigned int i = 1; i < polynomialOrder; ++i) {
+        *pout += c[i] * (p *= r);
+      }
+
+      inputIndex += blockDim.x * gridDim.x;
+    }
+
+    syncthreads();
+
+    // Accumulate results from shared memory
+    unsigned int offset = 1;
+    while ((offset * 2) < blockIdx.x) {
+      if (threadIdx.x % (offset * 2) == 0)
+        *pout += *(pout + offset);
+      offset *= 2;
+      syncthreads();
+    }
+
+    if (threadIdx.x == 0)
+      atomicAdd(output, *pout);
 }
 
 /* Used in Assignment 2. Coming soon! */
@@ -106,8 +140,43 @@ cudaSum_nondivtree_kernel(const float* const inputs,
                                   const float* const c,
                                   unsigned int polynomialOrder, 
                                   float * output) {
-    
+    extern __shared__ float partial_outputs[];
 
+    unsigned int inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    float * const pout = partial_outputs + threadIdx.x;
+
+    // Initialize shared memory to 0.0
+    *pout = 0;
+
+    if (polynomialOrder == 0)
+       return;
+
+    while (inputIndex < numberOfInputs) {
+      *pout += c[0];
+
+      float p = 1.0;
+      float r = inputs[inputIndex];
+      
+      for (unsigned int i = 1; i < polynomialOrder; ++i) {
+        *pout += c[i] * (p *= r);
+      }
+
+      inputIndex += blockDim.x * gridDim.x;
+    }
+
+    syncthreads();
+
+    // Accumulate results from shared memory
+    unsigned int offset = blockDim.x / 2;
+    while (offset) {
+      if (threadIdx.x < offset)
+        *pout += *(pout + offset);
+      offset /= 2;
+      syncthreads();
+    }
+
+    if (threadIdx.x == 0)
+      atomicAdd(output, *pout);
 }
 
 /* Used in Assignment 2. Coming soon! */
