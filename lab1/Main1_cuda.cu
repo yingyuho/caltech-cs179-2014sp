@@ -121,7 +121,7 @@ cudaSum_divtree_kernel(const float* const inputs,
 
     // Accumulate results from shared memory
     unsigned int offset = 1;
-    while ((offset * 2) < blockIdx.x) {
+    while (offset < blockDim.x) {
       if (threadIdx.x % (offset * 2) == 0)
         *pout += *(pout + offset);
       offset *= 2;
