@@ -31,22 +31,22 @@ int main(int argc, char* argv[]) {
   vector<Style> styles;
   styles.push_back(mutex);
   styles.push_back(linear);
+  styles.push_back(divtree);
+  styles.push_back(nondivtree);
   
   
   /* TO BE UNLOCKED IN ASSIGNMENT 2 
-  styles.push_back(divtree);
-  styles.push_back(nondivtree);
   styles.push_back(constmem);
    */
   
   vector<string> styleTitles;
   styleTitles.push_back(string("mutex"));
   styleTitles.push_back(string("linear"));
+  styleTitles.push_back(string("divtree"));
+  styleTitles.push_back(string("nondivtree"));
   
   
   /* TO BE UNLOCKED IN ASSIGNMENT 2
-  styleTitles.push_back(string("divtree"));
-  styleTitles.push_back(string("nondivtree"));
   styleTitles.push_back(string("constmem"));
    */
   
